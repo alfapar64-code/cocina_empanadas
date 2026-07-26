@@ -250,16 +250,16 @@
                     alarm.play().catch(e => console.log("Audio no pudo reproducirse", e));
                     
                     if ("vibrate" in navigator) {
-                        navigator.vibrate([500, 200, 500, 200, 1000]);
-                    }
+    // Vibra 1 segundo, pausa medio, y repite 4 veces
+    navigator.vibrate([1000, 500, 1000, 500, 1000, 500, 2000]);
+}
 
-                    // AQUI ESTA LA MAGIA NUEVA: Dispara la notificación usando el Service Worker
-                    if ('serviceWorker' in navigator && Notification.permission === 'granted') {
-                        navigator.serviceWorker.ready.then(function(registration) {
-                            registration.showNotification('¡Bandeja Lista!', {
-                                body: 'El recorrido del horno ha terminado. Ingresa la siguiente bandeja.',
-                                icon: 'icono.png',
-                                vibrate: [500, 200, 500, 200, 1000]
+// ... unas líneas más abajo ...
+registration.showNotification('¡Bandeja Lista!', {
+    body: 'El recorrido del horno ha terminado. Ingresa la siguiente bandeja.',
+    icon: 'icono.png',
+    vibrate: [1000, 500, 1000, 500, 1000, 500, 2000] 
+});
                             });
                         });
                     }
