@@ -110,8 +110,7 @@
         const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSIQiE-U1XYQHpCj_n4AiuCY9ZcE2lSg58hijLk8rTUdNZXbT3KohcwpdXWwowRN7wV_Trg8m9qs6Jv/pub?output=csv";
         
         // =======================================================
-        // AQUI CAMBIAS EL TIEMPO. Por ahora lo dejé en 15 segundos para tu prueba.
-        // Después de confirmar que el reloj vibra, cámbialo a: 8 * 60
+        // TEMPORIZADOR EN 15 SEGUNDOS PARA PRUEBA
         // =======================================================
         const TIMER_DURATION = 15; 
 
@@ -249,17 +248,18 @@
                     alarm.currentTime = 0;
                     alarm.play().catch(e => console.log("Audio no pudo reproducirse", e));
                     
+                    // AQUI ESTA LA VIBRACION EXTENDIDA
                     if ("vibrate" in navigator) {
-    // Vibra 1 segundo, pausa medio, y repite 4 veces
-    navigator.vibrate([1000, 500, 1000, 500, 1000, 500, 2000]);
-}
+                        navigator.vibrate([1000, 500, 1000, 500, 1000, 500, 2000]);
+                    }
 
-// ... unas líneas más abajo ...
-registration.showNotification('¡Bandeja Lista!', {
-    body: 'El recorrido del horno ha terminado. Ingresa la siguiente bandeja.',
-    icon: 'icono.png',
-    vibrate: [1000, 500, 1000, 500, 1000, 500, 2000] 
-});
+                    // AQUI ESTA EL LLAMADO AL SERVICE WORKER CON LA VIBRACION EXTENDIDA
+                    if ('serviceWorker' in navigator && Notification.permission === 'granted') {
+                        navigator.serviceWorker.ready.then(function(registration) {
+                            registration.showNotification('¡Bandeja Lista!', {
+                                body: 'El recorrido del horno ha terminado. Ingresa la siguiente bandeja.',
+                                icon: 'icono.png',
+                                vibrate: [1000, 500, 1000, 500, 1000, 500, 2000]
                             });
                         });
                     }
