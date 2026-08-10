@@ -81,7 +81,6 @@
         <button class="btn-primary" onclick="goToScreen('screen-stock')">🛒 Registrar Stock Anterior</button>
         <button class="btn-action" onclick="calculate()">🔥 Calcular Bandejas</button>
         
-        <!-- NUEVA TARJETA: TEMPORIZADOR DE PIZZA -->
         <div class="card" style="border-left: 6px solid var(--warning); margin-top: 25px; background-color: rgba(253, 245, 230, 0.95);">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                 <h3 style="margin: 0; color: var(--secondary); text-align: left; font-size: 1.4em;">🍕 Horno Pizza</h3>
@@ -111,7 +110,6 @@
     </div>
 
     <script>
-        // Registrar el Service Worker
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js')
             .then(reg => console.log('Service Worker registrado correctamente'))
@@ -123,6 +121,9 @@
         let activeTimers = {}; 
         let audioUnlocked = false; 
         let wakeLock = null;
+
+        // VARIABLE DINÁMICA: Ahora se actualizará con lo que diga Google Sheets
+        let TIMER_DURATION = 7 * 60; 
 
         async function requestWakeLock() {
             try {
@@ -151,7 +152,6 @@
         });
 
         const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSIQiE-U1XYQHpCj_n4AiuCY9ZcE2lSg58hijLk8rTUdNZXbT3KohcwpdXWwowRN7wV_Trg8m9qs6Jv/pub?output=csv";
-        const TIMER_DURATION = 7 * 60; 
 
         window.addEventListener('DOMContentLoaded', (event) => { loadCSVData(); });
         
@@ -184,15 +184,33 @@
         }
 
         function processCSVData(data) {
+            // VERIFICACIÓN DEL TIEMPO DESDE GOOGLE SHEETS
+            if (data[0] && data[0].Tiempo_Minutos !== undefined) {
+                let minutosSheet = parseFloat(data[0].Tiempo_Minutos);
+                if (!isNaN(minutosSheet) && minutosSheet > 0) {
+                    TIMER_DURATION = minutosSheet * 60;
+                    // Actualizamos visualmente el botón
+                    let btnPizza = document.getElementById('btn-pizza');
+                    if (btnPizza && !activeTimers['pizza']) {
+                        btnPizza.innerHTML = `⏱️ Iniciar (${minutosSheet} Minutos)`;
+                    }
+                }
+            }
+
+            // Filtramos las columnas de datos
             data = data.filter(row => row.Sabor_ID && row.Sabor_Nombre);
             if (data.length === 0) return;
             flavors = []; protocols = {};
-            let protocolNames = Object.keys(data[0]).filter(k => k !== 'Sabor_ID' && k !== 'Sabor_Nombre');
+            
+            // Excluimos Sabor_ID, Sabor_Nombre y la nueva columna Tiempo_Minutos
+            let protocolNames = Object.keys(data[0]).filter(k => k !== 'Sabor_ID' && k !== 'Sabor_Nombre' && k !== 'Tiempo_Minutos');
+            
             protocolNames.forEach(p => { protocols[p] = {}; });
             data.forEach(row => {
                 flavors.push({ id: row.Sabor_ID, name: row.Sabor_Nombre });
                 protocolNames.forEach(p => { protocols[p][row.Sabor_ID] = parseInt(row[p]) || 0; });
             });
+            
             setupUI(protocolNames);
             document.getElementById('loading-overlay').style.display = 'none';
             goToScreen('screen-main');
@@ -249,7 +267,6 @@
             let timerDisplay = document.getElementById(`timer-${index}`);
             if (checkbox.checked) {
                 card.classList.add('done');
-                // Al arrancar empanadas, enviamos el mensaje por defecto
                 startTimer(index, TIMER_DURATION, timerDisplay);
             } else {
                 card.classList.remove('done');
@@ -257,30 +274,26 @@
             }
         }
 
-        // --- FUNCIÓN EXCLUSIVA PARA EL BOTÓN DE LA PIZZA ---
         function togglePizzaTimer() {
             let timerDisplay = document.getElementById('timer-pizza');
             let btn = document.getElementById('btn-pizza');
+            let minutosActuales = TIMER_DURATION / 60;
             
             if (activeTimers['pizza']) {
-                // Si está corriendo, detenerlo
                 stopTimer('pizza', timerDisplay);
-                btn.innerHTML = "⏱️ Iniciar (7 Minutos)";
+                btn.innerHTML = `⏱️ Iniciar (${minutosActuales} Minutos)`;
                 btn.className = "btn-success";
             } else if (timerDisplay.classList.contains('finished')) {
-                // Si ya terminó y está titilando, apagar la alarma
                 timerDisplay.classList.remove('active', 'finished');
                 let alarm = document.getElementById('alarm-sound');
                 alarm.pause(); alarm.currentTime = 0;
-                btn.innerHTML = "⏱️ Iniciar (7 Minutos)";
+                btn.innerHTML = `⏱️ Iniciar (${minutosActuales} Minutos)`;
                 btn.className = "btn-success";
             } else {
-                // Iniciar Temporizador de Pizza y mandarle los textos personalizados a la función central
                 startTimer('pizza', TIMER_DURATION, timerDisplay, "🔔 ¡PIZZA LISTA!", "¡Pizza Lista!", "Saca la pizza del horno, el tiempo ha terminado.");
                 btn.innerHTML = "⏹️ Cancelar Pizza";
-                btn.className = "btn-action"; // Botón Rojo
+                btn.className = "btn-action";
                 
-                // Hack para garantizar que el audio funcione si se toca la pizza primero
                 if (!audioUnlocked) {
                     let alarm = document.getElementById('alarm-sound');
                     alarm.volume = 0; 
@@ -297,7 +310,6 @@
             }
         }
 
-        // --- CEREBRO CENTRAL DEL TEMPORIZADOR (Ahora acepta textos personalizados) ---
         function startTimer(index, durationInSeconds, displayElement, uiMessage = "🔔 ¡SIGUIENTE BANDEJA!", notifTitle = "¡Bandeja Lista!", notifBody = "El recorrido del horno ha terminado. Ingresa la siguiente bandeja.") {
             if (activeTimers[index]) { clearInterval(activeTimers[index]); }
             let timeRemaining = durationInSeconds;
@@ -313,7 +325,6 @@
                     clearInterval(activeTimers[index]);
                     delete activeTimers[index]; 
                     
-                    // Mostramos el texto personalizado que le enviamos
                     displayElement.innerHTML = uiMessage;
                     displayElement.classList.add('finished');
                     
@@ -334,7 +345,6 @@
                     }
                     checkAndReleaseWakeLock();
 
-                    // Si el temporizador que terminó era el de la pizza, cambiamos su botón a Azul para apagar la alarma
                     if (index === 'pizza') {
                         let btn = document.getElementById('btn-pizza');
                         if(btn) {
@@ -483,11 +493,11 @@
             let alarm = document.getElementById('alarm-sound');
             alarm.pause(); alarm.currentTime = 0;
             
-            // También reiniciamos visualmente el botón de la pizza si estaba encendido
             let btnPizza = document.getElementById('btn-pizza');
             let timerPizza = document.getElementById('timer-pizza');
+            let minutosActuales = TIMER_DURATION / 60;
             if(btnPizza) {
-                btnPizza.innerHTML = "⏱️ Iniciar (7 Minutos)";
+                btnPizza.innerHTML = `⏱️ Iniciar (${minutosActuales} Minutos)`;
                 btnPizza.className = "btn-success";
                 timerPizza.classList.remove('active', 'finished');
             }
