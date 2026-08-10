@@ -57,7 +57,6 @@
         .loader { border: 5px solid #f3f3f3; border-top: 5px solid var(--primary); border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; margin-bottom: 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
-        /* Indicador de Candado de Pantalla (Opcional, para que sepas que está activo) */
         #wake-lock-status { position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 20px; font-size: 0.8em; display: none; z-index: 100; }
     </style>
 </head>
@@ -73,6 +72,7 @@
         <h1>Central de Empanadas</h1>
         <p>Asistente de Cocción</p>
     </header>
+    
     <div id="screen-main" class="screen">
         <div class="card">
             <label for="protocol-select">Protocolo del día:</label>
@@ -80,8 +80,19 @@
         </div>
         <button class="btn-primary" onclick="goToScreen('screen-stock')">🛒 Registrar Stock Anterior</button>
         <button class="btn-action" onclick="calculate()">🔥 Calcular Bandejas</button>
-        <button class="btn-outline" onclick="loadCSVData()">🔄 Recargar Datos (Google Sheets)</button>
+        
+        <!-- NUEVA TARJETA: TEMPORIZADOR DE PIZZA -->
+        <div class="card" style="border-left: 6px solid var(--warning); margin-top: 25px; background-color: rgba(253, 245, 230, 0.95);">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <h3 style="margin: 0; color: var(--secondary); text-align: left; font-size: 1.4em;">🍕 Horno Pizza</h3>
+                <span class="timer-display" id="timer-pizza" style="font-size: 1.4em; padding: 10px 15px;"></span>
+            </div>
+            <button id="btn-pizza" class="btn-success" onclick="togglePizzaTimer()" style="margin-top: 15px; margin-bottom: 0;">⏱️ Iniciar (7 Minutos)</button>
+        </div>
+
+        <button class="btn-outline" onclick="loadCSVData()" style="margin-top: 25px;">🔄 Recargar Datos (Google Sheets)</button>
     </div>
+    
     <div id="screen-stock" class="screen">
         <div class="card">
             <label>Sobras del día anterior:</label>
@@ -90,6 +101,7 @@
         </div>
         <button class="btn-primary" onclick="goToScreen('screen-main')">Confirmar y Volver</button>
     </div>
+    
     <div id="screen-results" class="screen">
         <div class="card" style="background-color: var(--secondary); color: white; padding: 15px; margin-bottom: 20px;">
             <h2 style="text-align: center; margin: 0;">Orden de Cocción</h2>
@@ -110,18 +122,13 @@
         let flavors = [];
         let activeTimers = {}; 
         let audioUnlocked = false; 
-        
-        // VARIABLES DEL CANDADO DE PANTALLA (Wake Lock)
         let wakeLock = null;
 
-        // Función para encender el candado de pantalla
         async function requestWakeLock() {
             try {
                 if ('wakeLock' in navigator) {
                     wakeLock = await navigator.wakeLock.request('screen');
                     document.getElementById('wake-lock-status').style.display = 'block';
-                    
-                    // Si por algún motivo el teléfono lo bloquea y lo suelta, intentamos recuperarlo
                     wakeLock.addEventListener('release', () => {
                         document.getElementById('wake-lock-status').style.display = 'none';
                     });
@@ -131,16 +138,12 @@
             }
         }
 
-        // Función para apagar el candado si ya no hay temporizadores
         function checkAndReleaseWakeLock() {
             if (wakeLock !== null && Object.keys(activeTimers).length === 0) {
-                wakeLock.release().then(() => {
-                    wakeLock = null;
-                });
+                wakeLock.release().then(() => { wakeLock = null; });
             }
         }
 
-        // Si el usuario sale a otra app y vuelve, reactivar el candado si hay temporizadores corriendo
         document.addEventListener('visibilitychange', async () => {
             if (wakeLock !== null && document.visibilityState === 'visible' && Object.keys(activeTimers).length > 0) {
                 requestWakeLock();
@@ -148,15 +151,9 @@
         });
 
         const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSIQiE-U1XYQHpCj_n4AiuCY9ZcE2lSg58hijLk8rTUdNZXbT3KohcwpdXWwowRN7wV_Trg8m9qs6Jv/pub?output=csv";
-        
-        // =======================================================
-        // TIEMPO: 7 Minutos y 30 Segundos = 450 Segundos
-        // =======================================================
         const TIMER_DURATION = 7 * 60; 
 
-        window.addEventListener('DOMContentLoaded', (event) => {
-            loadCSVData();
-        });
+        window.addEventListener('DOMContentLoaded', (event) => { loadCSVData(); });
         
         document.body.addEventListener('click', function() {
             if (!audioUnlocked) {
@@ -165,11 +162,8 @@
                 let playPromise = alarm.play();
                 if (playPromise !== undefined) {
                     playPromise.then(_ => {
-                        alarm.pause();
-                        alarm.currentTime = 0;
-                        alarm.volume = 1; 
-                        audioUnlocked = true;
-                    }).catch(error => { console.log("Esperando interacción para audio..."); });
+                        alarm.pause(); alarm.currentTime = 0; alarm.volume = 1; audioUnlocked = true;
+                    }).catch(error => { console.log("Esperando interacción..."); });
                 }
             }
             if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
@@ -180,9 +174,7 @@
         function loadCSVData() {
             document.getElementById('loading-overlay').style.display = 'flex';
             Papa.parse(csvUrl, {
-                download: true,
-                header: true,
-                dynamicTyping: true,
+                download: true, header: true, dynamicTyping: true,
                 complete: function(results) { processCSVData(results.data); },
                 error: function(error) {
                     alert("Error al cargar los datos: " + error.message);
@@ -194,8 +186,7 @@
         function processCSVData(data) {
             data = data.filter(row => row.Sabor_ID && row.Sabor_Nombre);
             if (data.length === 0) return;
-            flavors = [];
-            protocols = {};
+            flavors = []; protocols = {};
             let protocolNames = Object.keys(data[0]).filter(k => k !== 'Sabor_ID' && k !== 'Sabor_Nombre');
             protocolNames.forEach(p => { protocols[p] = {}; });
             data.forEach(row => {
@@ -212,9 +203,7 @@
             select.innerHTML = '';
             protocolNames.forEach(p => {
                 let option = document.createElement('option');
-                option.value = p;
-                option.textContent = p.replace(/_/g, ' '); 
-                select.appendChild(option);
+                option.value = p; option.textContent = p.replace(/_/g, ' '); select.appendChild(option);
             });
             const stockList = document.getElementById('stock-list');
             stockList.innerHTML = '';
@@ -234,9 +223,7 @@
         function updateStock(id, change) {
             let input = document.getElementById(`stock-${id}`);
             let val = parseInt(input.value) || 0;
-            val += change;
-            if (val < 0) val = 0;
-            input.value = val;
+            val += change; if (val < 0) val = 0; input.value = val;
         }
 
         function validateStock(id) {
@@ -262,6 +249,7 @@
             let timerDisplay = document.getElementById(`timer-${index}`);
             if (checkbox.checked) {
                 card.classList.add('done');
+                // Al arrancar empanadas, enviamos el mensaje por defecto
                 startTimer(index, TIMER_DURATION, timerDisplay);
             } else {
                 card.classList.remove('done');
@@ -269,14 +257,53 @@
             }
         }
 
-        function startTimer(index, durationInSeconds, displayElement) {
+        // --- FUNCIÓN EXCLUSIVA PARA EL BOTÓN DE LA PIZZA ---
+        function togglePizzaTimer() {
+            let timerDisplay = document.getElementById('timer-pizza');
+            let btn = document.getElementById('btn-pizza');
+            
+            if (activeTimers['pizza']) {
+                // Si está corriendo, detenerlo
+                stopTimer('pizza', timerDisplay);
+                btn.innerHTML = "⏱️ Iniciar (7 Minutos)";
+                btn.className = "btn-success";
+            } else if (timerDisplay.classList.contains('finished')) {
+                // Si ya terminó y está titilando, apagar la alarma
+                timerDisplay.classList.remove('active', 'finished');
+                let alarm = document.getElementById('alarm-sound');
+                alarm.pause(); alarm.currentTime = 0;
+                btn.innerHTML = "⏱️ Iniciar (7 Minutos)";
+                btn.className = "btn-success";
+            } else {
+                // Iniciar Temporizador de Pizza y mandarle los textos personalizados a la función central
+                startTimer('pizza', TIMER_DURATION, timerDisplay, "🔔 ¡PIZZA LISTA!", "¡Pizza Lista!", "Saca la pizza del horno, el tiempo ha terminado.");
+                btn.innerHTML = "⏹️ Cancelar Pizza";
+                btn.className = "btn-action"; // Botón Rojo
+                
+                // Hack para garantizar que el audio funcione si se toca la pizza primero
+                if (!audioUnlocked) {
+                    let alarm = document.getElementById('alarm-sound');
+                    alarm.volume = 0; 
+                    let playPromise = alarm.play();
+                    if (playPromise !== undefined) {
+                        playPromise.then(_ => {
+                            alarm.pause(); alarm.currentTime = 0; alarm.volume = 1; audioUnlocked = true;
+                        }).catch(e => {});
+                    }
+                }
+                if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
+                    Notification.requestPermission();
+                }
+            }
+        }
+
+        // --- CEREBRO CENTRAL DEL TEMPORIZADOR (Ahora acepta textos personalizados) ---
+        function startTimer(index, durationInSeconds, displayElement, uiMessage = "🔔 ¡SIGUIENTE BANDEJA!", notifTitle = "¡Bandeja Lista!", notifBody = "El recorrido del horno ha terminado. Ingresa la siguiente bandeja.") {
             if (activeTimers[index]) { clearInterval(activeTimers[index]); }
             let timeRemaining = durationInSeconds;
             displayElement.classList.add('active');
             displayElement.classList.remove('finished');
             updateDisplayText();
-            
-            // ACTIVAR CANDADO DE PANTALLA
             requestWakeLock();
 
             activeTimers[index] = setInterval(() => {
@@ -284,30 +311,37 @@
                 updateDisplayText();
                 if (timeRemaining <= 0) {
                     clearInterval(activeTimers[index]);
-                    delete activeTimers[index]; // Limpiar el timer de la memoria
-                    displayElement.innerHTML = "🔔 ¡SIGUIENTE BANDEJA!";
+                    delete activeTimers[index]; 
+                    
+                    // Mostramos el texto personalizado que le enviamos
+                    displayElement.innerHTML = uiMessage;
                     displayElement.classList.add('finished');
                     
                     let alarm = document.getElementById('alarm-sound');
                     alarm.currentTime = 0;
                     alarm.play().catch(e => console.log("Audio no pudo reproducirse", e));
                     
-                    if ("vibrate" in navigator) {
-                        navigator.vibrate([1000, 500, 1000, 500, 1000, 500, 2000]);
-                    }
+                    if ("vibrate" in navigator) { navigator.vibrate([1000, 500, 1000, 500, 1000, 500, 2000]); }
 
                     if ('serviceWorker' in navigator && Notification.permission === 'granted') {
                         navigator.serviceWorker.ready.then(function(registration) {
-                            registration.showNotification('¡Bandeja Lista!', {
-                                body: 'El recorrido del horno ha terminado. Ingresa la siguiente bandeja.',
+                            registration.showNotification(notifTitle, {
+                                body: notifBody,
                                 icon: 'icono.png',
                                 vibrate: [1000, 500, 1000, 500, 1000, 500, 2000]
                             });
                         });
                     }
-                    
-                    // REVISAR SI PODEMOS APAGAR LA PANTALLA
                     checkAndReleaseWakeLock();
+
+                    // Si el temporizador que terminó era el de la pizza, cambiamos su botón a Azul para apagar la alarma
+                    if (index === 'pizza') {
+                        let btn = document.getElementById('btn-pizza');
+                        if(btn) {
+                            btn.innerHTML = "✅ Apagar Alarma";
+                            btn.className = "btn-primary";
+                        }
+                    }
                 }
             }, 1000);
 
@@ -321,29 +355,21 @@
         }
 
         function stopTimer(index, displayElement) {
-            if (activeTimers[index]) {
-                clearInterval(activeTimers[index]);
-                delete activeTimers[index];
-            }
+            if (activeTimers[index]) { clearInterval(activeTimers[index]); delete activeTimers[index]; }
             displayElement.classList.remove('active');
             displayElement.classList.remove('finished');
             let alarm = document.getElementById('alarm-sound');
-            alarm.pause();
-            alarm.currentTime = 0;
-            
-            // SI CANCELAS MANUALMENTE, REVISAR SI PODEMOS APAGAR LA PANTALLA
+            alarm.pause(); alarm.currentTime = 0;
             checkAndReleaseWakeLock();
         }
 
         function calculate() {
             Object.keys(activeTimers).forEach(idx => { clearInterval(activeTimers[idx]); });
-            activeTimers = {};
-            checkAndReleaseWakeLock(); // Apagar candado si se recalcula todo
+            activeTimers = {}; checkAndReleaseWakeLock(); 
             
             let protocolId = document.getElementById('protocol-select').value;
             let target = { ...protocols[protocolId] };
-            let needed = {};
-            let totalNeeded = 0;
+            let needed = {}; let totalNeeded = 0;
 
             flavors.forEach(f => {
                 let stock = parseInt(document.getElementById(`stock-${f.id}`).value) || 0;
@@ -352,18 +378,12 @@
                 totalNeeded += needed[f.id];
             });
 
-            if (totalNeeded === 0) {
-                alert("¡El stock actual ya cubre o supera el protocolo! No hay nada que cocinar.");
-                return;
-            }
+            if (totalNeeded === 0) { alert("¡El stock actual ya cubre o supera el protocolo! No hay nada que cocinar."); return; }
 
             let trays = [];
-            let csNeeded = needed['CS'] || 0;
-            delete needed['CS'];
-            let cqNeeded = needed['CQ'] || 0;
-            let caNeeded = needed['CA'] || 0;
-            delete needed['CQ'];
-            delete needed['CA'];
+            let csNeeded = needed['CS'] || 0; delete needed['CS'];
+            let cqNeeded = needed['CQ'] || 0; let caNeeded = needed['CA'] || 0;
+            delete needed['CQ']; delete needed['CA'];
 
             let remainingFlavors = Object.keys(needed).filter(k => needed[k] > 0);
 
@@ -413,8 +433,7 @@
 
             let caCqTotal = caNeeded + cqNeeded;
             while (caCqTotal > 0) {
-                let items = {};
-                let traySpace = 12; 
+                let items = {}; let traySpace = 12; 
                 let takeCa = Math.min(caNeeded, traySpace);
                 if (takeCa > 0) { items['CA'] = takeCa; caNeeded -= takeCa; traySpace -= takeCa; }
                 let takeCq = Math.min(cqNeeded, traySpace);
@@ -459,12 +478,20 @@
 
         function resetApp() {
             Object.keys(activeTimers).forEach(idx => clearInterval(activeTimers[idx]));
-            activeTimers = {};
-            checkAndReleaseWakeLock();
+            activeTimers = {}; checkAndReleaseWakeLock();
             
             let alarm = document.getElementById('alarm-sound');
-            alarm.pause();
-            alarm.currentTime = 0;
+            alarm.pause(); alarm.currentTime = 0;
+            
+            // También reiniciamos visualmente el botón de la pizza si estaba encendido
+            let btnPizza = document.getElementById('btn-pizza');
+            let timerPizza = document.getElementById('timer-pizza');
+            if(btnPizza) {
+                btnPizza.innerHTML = "⏱️ Iniciar (7 Minutos)";
+                btnPizza.className = "btn-success";
+                timerPizza.classList.remove('active', 'finished');
+            }
+
             flavors.forEach(f => document.getElementById(`stock-${f.id}`).value = 0);
             const select = document.getElementById('protocol-select');
             if (select.options.length > 0) { select.selectedIndex = 0; }
