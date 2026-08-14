@@ -81,12 +81,13 @@
         <button class="btn-primary" onclick="goToScreen('screen-stock')">🛒 Registrar Stock Anterior</button>
         <button class="btn-action" onclick="calculate()">🔥 Calcular Bandejas</button>
         
+        <!-- TARJETA DEL TEMPORIZADOR DE PIZZA -->
         <div class="card" style="border-left: 6px solid var(--warning); margin-top: 25px; background-color: rgba(253, 245, 230, 0.95);">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                 <h3 style="margin: 0; color: var(--secondary); text-align: left; font-size: 1.4em;">🍕 Horno Pizza</h3>
                 <span class="timer-display" id="timer-pizza" style="font-size: 1.4em; padding: 10px 15px;"></span>
             </div>
-            <button id="btn-pizza" class="btn-success" onclick="togglePizzaTimer()" style="margin-top: 15px; margin-bottom: 0;">⏱️ Iniciar (7 Minutos)</button>
+            <button id="btn-pizza" class="btn-success" onclick="togglePizzaTimer()" style="margin-top: 15px; margin-bottom: 0;">⏱️ Iniciar</button>
         </div>
 
         <button class="btn-outline" onclick="loadCSVData()" style="margin-top: 25px;">🔄 Recargar Datos (Google Sheets)</button>
@@ -122,8 +123,9 @@
         let audioUnlocked = false; 
         let wakeLock = null;
 
-        // VARIABLE DINÁMICA: Ahora se actualizará con lo que diga Google Sheets
-        let TIMER_DURATION = 7 * 60; 
+        // VARIABLES DINÁMICAS INDEPENDIENTES (Valores por defecto en caso de fallo)
+        let TIMER_EMPANADAS = 7 * 60; 
+        let TIMER_PIZZA = 7 * 60; 
 
         async function requestWakeLock() {
             try {
@@ -184,26 +186,40 @@
         }
 
         function processCSVData(data) {
-            // VERIFICACIÓN DEL TIEMPO DESDE GOOGLE SHEETS
-            if (data[0] && data[0].Tiempo_Minutos !== undefined) {
-                let minutosSheet = parseFloat(data[0].Tiempo_Minutos);
-                if (!isNaN(minutosSheet) && minutosSheet > 0) {
-                    TIMER_DURATION = minutosSheet * 60;
-                    // Actualizamos visualmente el botón
-                    let btnPizza = document.getElementById('btn-pizza');
-                    if (btnPizza && !activeTimers['pizza']) {
-                        btnPizza.innerHTML = `⏱️ Iniciar (${minutosSheet} Minutos)`;
+            // LECTURA INDEPENDIENTE DE LAS DOS COLUMNAS DE TIEMPO
+            if (data[0]) {
+                // 1. Tiempo de Empanadas
+                if (data[0].Tiempo_Minutos !== undefined) {
+                    let minEmpanadas = parseFloat(data[0].Tiempo_Minutos);
+                    if (!isNaN(minEmpanadas) && minEmpanadas > 0) {
+                        TIMER_EMPANADAS = minEmpanadas * 60;
+                    }
+                }
+                
+                // 2. Tiempo de Pizza
+                if (data[0].Tiempo_Pizza !== undefined) {
+                    let minPizza = parseFloat(data[0].Tiempo_Pizza);
+                    if (!isNaN(minPizza) && minPizza > 0) {
+                        TIMER_PIZZA = minPizza * 60;
+                        let btnPizza = document.getElementById('btn-pizza');
+                        if (btnPizza && !activeTimers['pizza']) {
+                            btnPizza.innerHTML = `⏱️ Iniciar (${minPizza} Minutos)`;
+                        }
                     }
                 }
             }
 
-            // Filtramos las columnas de datos
             data = data.filter(row => row.Sabor_ID && row.Sabor_Nombre);
             if (data.length === 0) return;
             flavors = []; protocols = {};
             
-            // Excluimos Sabor_ID, Sabor_Nombre y la nueva columna Tiempo_Minutos
-            let protocolNames = Object.keys(data[0]).filter(k => k !== 'Sabor_ID' && k !== 'Sabor_Nombre' && k !== 'Tiempo_Minutos');
+            // Excluimos las columnas de configuración para que no armen protocolos basura
+            let protocolNames = Object.keys(data[0]).filter(k => 
+                k !== 'Sabor_ID' && 
+                k !== 'Sabor_Nombre' && 
+                k !== 'Tiempo_Minutos' && 
+                k !== 'Tiempo_Pizza'
+            );
             
             protocolNames.forEach(p => { protocols[p] = {}; });
             data.forEach(row => {
@@ -267,7 +283,8 @@
             let timerDisplay = document.getElementById(`timer-${index}`);
             if (checkbox.checked) {
                 card.classList.add('done');
-                startTimer(index, TIMER_DURATION, timerDisplay);
+                // Al arrancar bandeja de empanadas, usamos TIMER_EMPANADAS
+                startTimer(index, TIMER_EMPANADAS, timerDisplay);
             } else {
                 card.classList.remove('done');
                 stopTimer(index, timerDisplay);
@@ -277,7 +294,7 @@
         function togglePizzaTimer() {
             let timerDisplay = document.getElementById('timer-pizza');
             let btn = document.getElementById('btn-pizza');
-            let minutosActuales = TIMER_DURATION / 60;
+            let minutosActuales = TIMER_PIZZA / 60;
             
             if (activeTimers['pizza']) {
                 stopTimer('pizza', timerDisplay);
@@ -290,7 +307,8 @@
                 btn.innerHTML = `⏱️ Iniciar (${minutosActuales} Minutos)`;
                 btn.className = "btn-success";
             } else {
-                startTimer('pizza', TIMER_DURATION, timerDisplay, "🔔 ¡PIZZA LISTA!", "¡Pizza Lista!", "Saca la pizza del horno, el tiempo ha terminado.");
+                // Al arrancar pizza, usamos TIMER_PIZZA
+                startTimer('pizza', TIMER_PIZZA, timerDisplay, "🔔 ¡PIZZA LISTA!", "¡Pizza Lista!", "Saca la pizza del horno, el tiempo ha terminado.");
                 btn.innerHTML = "⏹️ Cancelar Pizza";
                 btn.className = "btn-action";
                 
@@ -495,7 +513,7 @@
             
             let btnPizza = document.getElementById('btn-pizza');
             let timerPizza = document.getElementById('timer-pizza');
-            let minutosActuales = TIMER_DURATION / 60;
+            let minutosActuales = TIMER_PIZZA / 60;
             if(btnPizza) {
                 btnPizza.innerHTML = `⏱️ Iniciar (${minutosActuales} Minutos)`;
                 btnPizza.className = "btn-success";
